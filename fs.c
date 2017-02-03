@@ -25,8 +25,9 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 
 	if(opmode == 1)
 	{
-		char * lastbar = strrchr(fname,'\\');
+		char * lastbar = strrchr(fname,'/');
 		*lastbar = '\0';
+		if(strlen(fname) == 0) return 2; //retorna o endereço da raiz
 	}
 
 	// Fila dos blocos a serem percorridos.
@@ -47,24 +48,23 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 	visitado[sb->root] = 1;
 	fim++;
 
-	struct inode in;
-	struct nodeinfo ni;
+	struct inode *in = (struct inode*) calloc(sb->blksz,1);
+	struct nodeinfo *ni = (struct nodeinfo*) calloc(sb->blksz,1);
 	while(inicio < fim)
 	{
 		// Colocando o ponteiro na posição indicada pelo início da fila.
 		lseek(sb->fd, (fila[inicio] * sb->blksz), SEEK_SET);
 		// Lendo os dados do início da fila.
-		aux = read(sb->fd, &in, sb->blksz);
-
+		aux = read(sb->fd, in, sb->blksz);
 		// Se o inode in for de um arquivo regular (não é filho).
-		if(in.mode == IMREG)
+		if(in->mode == IMREG)
 		{
 			// Posicionando o ponteiro na posição do nodeinfo.
-			lseek(sb->fd, ((in.meta)*sb->blksz), SEEK_SET);
+			lseek(sb->fd, ((in->meta)*sb->blksz), SEEK_SET);
 			// Lendo o nodeinfo.
-			aux = read(sb->fd, &ni, sb->blksz);
+			aux = read(sb->fd, ni, sb->blksz);
 			// Se o nome do arquivo é igual ao parâmetro proocurado.
-			if(strcmp(ni.name, fname) == 0)
+			if(strcmp(ni->name, fname) == 0)
 			{
 				// Libera os recursos e retorna o índice no FS.
 				aux = fila[inicio];
@@ -74,15 +74,15 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 			}
 		}
 		// Se o inode in for de uma pasta.
-		if(in.mode == IMDIR)
+		if(in->mode == IMDIR)
 		{
 			// Posicionando o ponteiro na posição do nodeinfo.
-			lseek(sb->fd, ((in.meta)*sb->blksz), SEEK_SET);
+			lseek(sb->fd, ((in->meta)*sb->blksz), SEEK_SET);
 			// Lendo o nodeinfo.
 			aux = read(sb->fd, &ni, sb->blksz);
 
 			// Se o nome do arquivo é igual ao parâmetro proocurado.
-			if(strcmp(ni.name, fname) == 0)
+			if(strcmp(ni->name, fname) == 0)
 			{
 				// Libera os recursos e retorna o índice no FS.
 				aux = fila[inicio];
@@ -92,15 +92,15 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 			}
 
 			// Para cada elemento da pasta.
-			for(i = 0; i < ni.size; i++)
+			for(i = 0; i < ni->size; i++)
 			{
 				// Se esse elemento não foi visitado.
-				if(visitado[in.links[i]] == 0)
+				if(visitado[in->links[i]] == 0)
 				{
 					// Marca ele como visitado.
-					visitado[in.links[i]] = 1;
+					visitado[in->links[i]] = 1;
 					// Insere ele no final da fila.
-					fila[fim] = in.links[i];
+					fila[fim] = in->links[i];
 					// Incrementa o final da fila.
 					fim++;
 				}
@@ -111,8 +111,10 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 
 	free(fila);
 	free(visitado);
+	free(ni);
+	free(in);
 	// Caso erro, retorna -1.
-	return (uint64_t) -1;
+	return -1;
 }
 
 /*
@@ -123,7 +125,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
 {
     int ii;
     uint64_t aux,iaux_n,n;
-    struct inode *iaux = (struct inode*) malloc (sb->blksz);
+    struct inode *iaux = (struct inode*) calloc (sb->blksz,1);
 
     if(in->next == 0)
     {
@@ -133,6 +135,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
             if(in->links[ii] == 0)
             {
                 in->links[ii] = block;
+                free(iaux);
                 return 0;
             }
         }
@@ -149,6 +152,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
         //escreve o novo inode
         lseek(sb->fd, n*sb->blksz, SEEK_SET);
         aux = write(sb->fd, iaux, sb->blksz);
+        free(iaux);
         if(aux == -1) return -1;
         return 0;
     }
@@ -157,7 +161,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
     {
         iaux_n = in->next;
         lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
-        aux = read(sb->fd, &iaux, sb->blksz);
+        aux = read(sb->fd, iaux, sb->blksz);
         in = iaux;
     }
 
@@ -170,6 +174,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
             //escreve o inode de volta
             lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
             aux = write(sb->fd, iaux, sb->blksz);
+            free(iaux);
             return 0;
         }
     }
@@ -186,6 +191,8 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
     //escreve o novo inode
     lseek(sb->fd, n*sb->blksz, SEEK_SET);
     aux = write(sb->fd, iaux, sb->blksz);
+
+    free(iaux);
     if(aux == -1) return -1;
     return 0;
     }
@@ -285,13 +292,13 @@ struct superblock * fs_format(const char *fname, uint64_t blocksize)
 	if(aux == -1) return NULL;
 
 	// Inicializando a pasta raiz.
-	struct nodeinfo* root_info = (struct nodeinfo*) malloc (sb->blksz);
+	struct nodeinfo* root_info = (struct nodeinfo*) calloc (sb->blksz,1);
 	root_info->size = 0;
 	strcpy(root_info->name, "/\0");
 	aux = write(sb->fd, root_info, sb->blksz);
 	free(root_info);
 
-	struct inode* root_inode = (struct inode*) malloc (sb->blksz);
+	struct inode* root_inode = (struct inode*) calloc (sb->blksz,1);
 	root_inode->mode = IMDIR;
 	root_inode->parent = 0;
 	root_inode->meta = 1;
@@ -522,17 +529,17 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 		return -1;
 	}
 
-	struct inode in;
-	struct nodeinfo ni;
+	struct inode *in = (struct inode*) calloc(sb->blksz,1);
+	struct nodeinfo *ni = (struct nodeinfo*) calloc(sb->blksz,1);
 	int aux, bufaux, nlinks, i, mod;
 	char* reader = (char*) malloc (sb->blksz);
 	// Posiciono o ponteiro na posição do inode do arquivo que vou ler.
 	lseek(sb->fd, block * sb->blksz, SEEK_SET);
 	// Carrego o inode.
-	aux = read(sb->fd, &in, sb->blksz);
+	aux = read(sb->fd, in, sb->blksz);
 
 	// Verifica se o arquivo não é uma pasta/diretório.
-	if(in.mode == IMDIR)
+	if(in->mode == IMDIR)
 	{
 		errno = EISDIR;
 		free (reader);
@@ -540,9 +547,9 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 	}
 
 	// Posiciono o ponteiro na posição do nodeinfo desse arquivo.
-	lseek(sb->fd, in.meta * sb->blksz, SEEK_SET);
+	lseek(sb->fd, in->meta * sb->blksz, SEEK_SET);
 	// Carrego o nodeinfo.
-	aux = read(sb->fd, &ni, sb->blksz);
+	aux = read(sb->fd, ni, sb->blksz);
 
 	// Quantos links tem 1 inode cheio.
 	nlinks = (sb->blksz - 4 * sizeof(uint64_t)) / sizeof(uint64_t);
@@ -550,13 +557,13 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 	bufaux = 0;
 
 	// Enquanto houver mais inodes e não passou do bufsz.
-	while(in.next > 0 && bufaux < bufsz)
+	while(in->next > 0 && bufaux < bufsz)
 	{
 		// Para todos os links do inode, se não passou de bufsz.
 		for(i = 0; i < nlinks && bufaux < bufsz; i++)
 		{
 			// Posiciono no link[i]
-			lseek(sb->fd, in.links[i] * sb->blksz, SEEK_SET);
+			lseek(sb->fd, in->links[i] * sb->blksz, SEEK_SET);
 			// Leio o link[i] numa variavel auxiliar reader.
 			aux = read(sb->fd, reader, sb->blksz);
 			// Concateno a reader com o buf.
@@ -565,18 +572,18 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 			bufaux += sizeof(sb->blksz);
 		}
 		// Posiciono e leio o próximo inode.
-		lseek(sb->fd, in.next * sb->blksz, SEEK_SET);
-		aux = read(sb->fd, &in, sb->blksz);
+		lseek(sb->fd, in->next * sb->blksz, SEEK_SET);
+		aux = read(sb->fd, in, sb->blksz);
 	}
 	// No último inode.
-	int nlinks_uin = ((ni.size % sb->blksz) / sizeof(uint64_t)) - 4;
+	int nlinks_uin = ((ni->size % sb->blksz) / sizeof(uint64_t)) - 4;
 	for(i = 0; i < nlinks_uin && bufaux < bufsz; i++)
 	{
 		// Se o bufsz for múltiplo de sb->blksz.
 		if(((uint64_t) bufsz) % (sb->blksz) == 0)
 		{
 			// Posiciono no link[i]
-			lseek(sb->fd, in.links[i] * sb->blksz, SEEK_SET);
+			lseek(sb->fd, in->links[i] * sb->blksz, SEEK_SET);
 			// Leio o link[i] numa variavel auxiliar reader.
 			aux = read(sb->fd, reader, sb->blksz);
 			// Concateno a reader com o buf.
@@ -589,7 +596,7 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 			// Calculo o mod em bufsz e sb->blksz.
 			mod = ((uint64_t) bufsz) % (sb->blksz);
 			// Posiciono no link[i]
-			lseek(sb->fd, in.links[i] * sb->blksz, SEEK_SET);
+			lseek(sb->fd, in->links[i] * sb->blksz, SEEK_SET);
 			// Leio o link[i] numa variavel auxiliar reader.
 			aux = read(sb->fd, reader, mod);
 			// Concateno a reader com o buf.
@@ -626,47 +633,50 @@ int fs_unlink(struct superblock *sb, const char *fname)
 		return -1;
 	}
 
-	struct inode curr_in;
-	struct inode next_in;
-	struct nodeinfo ni;
+	struct inode *curr_in = (struct inode*) calloc(sb->blksz,1);
+	struct inode *next_in = (struct inode*) calloc(sb->blksz,1);;
+	struct nodeinfo *ni = (struct nodeinfo*) calloc(sb->blksz,1);;
 	int aux;
 	int i, index;
 
 	// Posicionando o ponteiro na posição do primeiro inode para ler.
 	lseek(sb->fd, block*sb->blksz, SEEK_SET);
-	aux = read(sb->fd, &curr_in, sb->blksz);
+	aux = read(sb->fd, curr_in, sb->blksz);
 
 	// Verifica se é uma pasta.
-	if(curr_in.mode == IMDIR)
+	if(curr_in->mode == IMDIR)
 	{
 		errno = EISDIR;
+		free(curr_in);
+		free(next_in);
+		free(ni);
 		return -1;
 	}
 
 	// Lendo o nodeinfo para pegar o tamanho do arquivo.
-	lseek(sb->fd, curr_in.meta * sb->blksz, SEEK_SET);
-	aux = read(sb->fd, &ni, sb->blksz);
+	lseek(sb->fd, curr_in->meta * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, ni, sb->blksz);
 	// Pegando o número de bytes do arquivo.
-	int fsize = ni.size;
+	int fsize = ni->size;
 
 	// Liberando o nodeinfo desse arquivo.
-	fs_put_block(sb, curr_in.meta);
+	fs_put_block(sb, curr_in->meta);
 
 	// Se houver mais de um inode.
-	while(curr_in.next > 0)
+	while(curr_in->next > 0)
 	{
 		// Libero todos os links desse inode
 		// (todos estão em uso, já que tem mais inode).
 		for(i = 0; i < NLINKS; i++)
 		{
-			fs_put_block(sb, curr_in.links[i]);
+			fs_put_block(sb, curr_in->links[i]);
 		}
 
 		// Leio o próximo inode.
-		lseek(sb->fd, curr_in.next*sb->blksz, SEEK_SET);
-		aux = read(sb->fd, &next_in, sb->blksz);
+		lseek(sb->fd, curr_in->next*sb->blksz, SEEK_SET);
+		aux = read(sb->fd, next_in, sb->blksz);
 		// Salvo o indice do próximo inode.
-		index = curr_in.next;
+		index = curr_in->next;
 
 		// Libero o inode corrente.
 		fs_put_block(sb, block);
@@ -685,13 +695,16 @@ int fs_unlink(struct superblock *sb, const char *fname)
 	for(i = 0; i < nlinks_uin; i++)
 	{
 		// Libero os links.
-		fs_put_block(sb, curr_in.links[i]);
+		fs_put_block(sb, curr_in->links[i]);
 	}
 
 	// Libero o último inode.
 	fs_put_block(sb, block);
 
 	// Caso sucesso.
+    free(curr_in);
+    free(next_in);
+    free(ni);
 	return 0;
 }
 
@@ -713,7 +726,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 	}
 
 	//Erro se o caminho dname nao comeca com \ e se tem espaco
-	if((*dname != '\\') || (strchr(dname,' ') != NULL) )
+	if((*dname != '/') || (strchr(dname,' ') != NULL) )
 	{
 		errno = ENOENT;
 		return -1;
@@ -740,40 +753,41 @@ int fs_mkdir(struct superblock *sb, const char *dname)
     dir_n = fs_get_block(sb);
     dirni_n = fs_get_block(sb);
     if(dirni_n == -1 || dir_n == -1) return -1;
-    struct inode parentdir;
-    struct inode dir;
-    struct nodeinfo dirni, parent_ni;
-    dir.mode = IMDIR;
-    dir.next = 0;
-    dir.parent = parent_n;
-    dir.meta = dirni_n;
-    char *auxc = strrchr(dname,'\\');
-    strcpy(dirni.name,auxc);
-    dirni.size = 0;
+    struct inode *parentdir = (struct inode*) calloc(sb->blksz,1);
+    struct inode *dir = (struct inode*) calloc(sb->blksz,1);
+    struct nodeinfo *dirni = (struct nodeinfo*) calloc(sb->blksz,1);
+    struct nodeinfo *parent_ni = (struct nodeinfo*) calloc(sb->blksz,1);
+    dir->mode = IMDIR;
+    dir->next = 0;
+    dir->parent = parent_n;
+    dir->meta = dirni_n;
+    char *auxc = strrchr(dname,'/');
+    strcpy(dirni->name,auxc);
+    dirni->size = 0;
 
      //Le o inode diretorio pai
      lseek(sb->fd, parent_n*sb->blksz, SEEK_SET);
-     aux = read(sb->fd, &parentdir, sb->blksz);
+     aux = read(sb->fd, parentdir, sb->blksz);
 
      //linka o inode do novo dir ao dir pai
-     link_block(sb,&parentdir,parent_n,dir_n);
+     link_block(sb,parentdir,parent_n,dir_n);
 
       //Le o nodeinfo diretorio pai para alterar o numero de arquivos e escreve de volta
-     lseek(sb->fd, parentdir.meta*sb->blksz, SEEK_SET);
-     aux = read(sb->fd, &parent_ni, sb->blksz);
-     parent_ni.size++;
-     lseek(sb->fd, parentdir.meta*sb->blksz, SEEK_SET);
-	 aux = write(sb->fd,&parent_ni,sb->blksz);
+     lseek(sb->fd, parentdir->meta*sb->blksz, SEEK_SET);
+     aux = read(sb->fd, parent_ni, sb->blksz);
+     parent_ni->size++;
+     lseek(sb->fd, parentdir->meta*sb->blksz, SEEK_SET);
+	 aux = write(sb->fd,parent_ni,sb->blksz);
 
 	 //escreve de volta o inode do pai
 	 lseek(sb->fd, parent_n*sb->blksz, SEEK_SET);
-	 aux = write(sb->fd,&parentdir,sb->blksz);
+	 aux = write(sb->fd,parentdir,sb->blksz);
 
 	 //Escreve o inode e nodeinfo do novo diretorio
 	 lseek(sb->fd, dir_n*sb->blksz, SEEK_SET);
-	 aux = write(sb->fd,&dir,sb->blksz);
+	 aux = write(sb->fd,dir,sb->blksz);
 	 lseek(sb->fd, dirni_n*sb->blksz, SEEK_SET);
-	 aux = write(sb->fd,&dirni,sb->blksz);
+	 aux = write(sb->fd,dirni,sb->blksz);
 
 	return 0;
 }
@@ -807,10 +821,10 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 		return NULL;
 	}
 
-	struct inode in;
-	struct inode in_aux;
-	struct nodeinfo ni;
-	struct nodeinfo ni_aux;
+	struct inode *in = (struct inode*) calloc(sb->blksz,1);
+	struct inode *in_aux = (struct inode*) calloc(sb->blksz,1);
+	struct nodeinfo *ni = (struct nodeinfo*) calloc(sb->blksz,1);
+	struct nodeinfo *ni_aux = (struct nodeinfo*) calloc(sb->blksz,1);
 	int aux, i;
 	char* ret = (char*) malloc (500 * sizeof(char));
 	char* tok;
@@ -818,37 +832,37 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 
 	// Posiciono e leio o inode de dname.
 	lseek(sb->fd, block * sb->blksz, SEEK_SET);
-	aux = read(sb->fd, &in, sb->blksz);
+	aux = read(sb->fd, in, sb->blksz);
 
 	// Verifica se o caminho dname aponta para um diretório.
-	if(in.mode != IMDIR)
+	if(in->mode != IMDIR)
 	{
 		errno = ENOTDIR;
 		return NULL;
 	}
 
 	// Posicionando e lendo o nodeinfo do diretório dname.
-	lseek(sb->fd, in.meta * sb->blksz, SEEK_SET);
-	aux = read(sb->fd, &ni, sb->blksz);
+	lseek(sb->fd, in->meta * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, ni, sb->blksz);
 
 	// Percorrendo os links do diretório dname.
-	for(i = 0; i < ni.size; i++)
+	for(i = 0; i < ni->size; i++)
 	{
 		// Leio o inode de cada arquivo/pasta dentro do diretorio dname.
-		lseek(sb->fd, in.links[i], SEEK_SET);
-		aux = read(sb->fd, &in_aux, sb->blksz);
+		lseek(sb->fd, in->links[i], SEEK_SET);
+		aux = read(sb->fd, in_aux, sb->blksz);
 		// Leio o nodeinfo desse inode.
-		lseek(sb->fd, in_aux.meta, SEEK_SET);
-		aux = read(sb->fd, &ni_aux, sb->blksz);
+		lseek(sb->fd, in_aux->meta, SEEK_SET);
+		aux = read(sb->fd, ni_aux, sb->blksz);
 		// Pego o nome completo desse arquivo/pasta e divido ela em
 		// substrings divididas pela /. Salvo a última parte.
-		tok = strtok(ni_aux.name, "/");
+		tok = strtok(ni_aux->name, "/");
 		while(tok != NULL)
 		{
 			strcpy(name, tok);
 			tok = strtok(NULL, "/");
 		}
-		if(in_aux.mode == IMDIR)
+		if(in_aux->mode == IMDIR)
 			strcat(name, "/");
 
 		// Concateno o nome do arquivo/pasta com a string.
