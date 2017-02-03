@@ -761,7 +761,14 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 	}
 
 	struct inode in;
-	int aux;
+	struct inode in_aux;
+	struct nodeinfo ni;
+	struct nodeinfo ni_aux;
+	int aux, i;
+	char* ret = (char*) malloc (500 * sizeof(char));
+	char* tok;
+	char name[50];
+	
 	// Posiciono e leio o inode de dname.
 	lseek(sb->fd, block * sb->blksz, SEEK_SET);
 	aux = read(sb->fd, &in, sb->blksz);
@@ -773,8 +780,36 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 		return NULL;
 	}
 
+	// Posicionando e lendo o nodeinfo do diretório dname.
+	lseek(sb->fd, in.meta * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, &ni, sb->blksz);
 
+	// Percorrendo os links do diretório dname.
+	for(i = 0; i < ni.size; i++)
+	{
+		// Leio o inode de cada arquivo/pasta dentro do diretorio dname.
+		lseek(sb->fd, in.links[i], SEEK_SET);
+		aux = read(sb->fd, &in_aux, sb->blksz);
+		// Leio o nodeinfo desse inode.
+		lseek(sb->fd, in_aux.meta, SEEK_SET);
+		aux = read(sb->fd, &ni_aux, sb->blksz);
+		// Pego o nome completo desse arquivo/pasta e divido ela em
+		// substrings divididas pela /. Salvo a última parte.
+		tok = strtok(ni_aux.name, "/");
+		while(tok != NULL)
+		{
+			tok = strtok(NULL, "/");
+			strcpy(name, tok);
+		}
+		if(in_aux.mode == IMDIR)
+			strcat(name, "/");
 
+		// Concateno o nome do arquivo/pasta com a string.
+		strcat(ret, name);
+		// Acrescento um espaço entre os arquivos/pastas.
+		strcat(ret, " ");
+	}
+	return ret;
 
 /*	
 Verificar EBADF.
@@ -782,9 +817,8 @@ Verificar tamanho do nome.
 Verificar se o diretotio dname existe.
 Ler o inode.
 Verificar se dname é um diretótio.
+Ler o nodeinfo e ver quantos arquivos a pasta tem.
 Percorrer os links do diretório pegando o nome de cada arquivo e 
 diretório e encadeando eles.
 */
-
-	return NULL;
 }
