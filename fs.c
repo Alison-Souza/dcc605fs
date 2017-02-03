@@ -798,8 +798,8 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 		tok = strtok(ni_aux.name, "/");
 		while(tok != NULL)
 		{
-			tok = strtok(NULL, "/");
 			strcpy(name, tok);
+			tok = strtok(NULL, "/");
 		}
 		if(in_aux.mode == IMDIR)
 			strcat(name, "/");
