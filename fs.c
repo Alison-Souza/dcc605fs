@@ -189,7 +189,6 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t
     if(aux == -1) return -1;
     return 0;
     }
-
 //====================================================================//
 
 /* Build a new filesystem image in =fname (the file =fname should be
@@ -750,5 +749,76 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
 {
-	return NULL;
+		// Verifica o descritor do sistema de arquivos.
+	if(sb->magic != 0xdcc605f5)
+	{
+		errno = EBADF;
+		return NULL;
+	}
+
+	// Verifica se o nome do arquivo (caminho) é maior que o permitido.
+	if(strlen(dname) > ((sb->blksz) - (8*sizeof(uint64_t))))
+	{
+		errno = ENAMETOOLONG;
+		return NULL;
+	}
+
+	// Procura o indice do inode de dname, e verifica se dname existe.
+	uint64_t block = find_block(sb, dname, 0);
+	if(block < 0)
+	{
+		errno = ENOENT;
+		return NULL;
+	}
+
+	struct inode in;
+	struct inode in_aux;
+	struct nodeinfo ni;
+	struct nodeinfo ni_aux;
+	int aux, i;
+	char* ret = (char*) malloc (500 * sizeof(char));
+	char* tok;
+	char name[50];
+
+	// Posiciono e leio o inode de dname.
+	lseek(sb->fd, block * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, &in, sb->blksz);
+
+	// Verifica se o caminho dname aponta para um diretório.
+	if(in.mode != IMDIR)
+	{
+		errno = ENOTDIR;
+		return NULL;
+	}
+
+	// Posicionando e lendo o nodeinfo do diretório dname.
+	lseek(sb->fd, in.meta * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, &ni, sb->blksz);
+
+	// Percorrendo os links do diretório dname.
+	for(i = 0; i < ni.size; i++)
+	{
+		// Leio o inode de cada arquivo/pasta dentro do diretorio dname.
+		lseek(sb->fd, in.links[i], SEEK_SET);
+		aux = read(sb->fd, &in_aux, sb->blksz);
+		// Leio o nodeinfo desse inode.
+		lseek(sb->fd, in_aux.meta, SEEK_SET);
+		aux = read(sb->fd, &ni_aux, sb->blksz);
+		// Pego o nome completo desse arquivo/pasta e divido ela em
+		// substrings divididas pela /. Salvo a última parte.
+		tok = strtok(ni_aux.name, "/");
+		while(tok != NULL)
+		{
+			strcpy(name, tok);
+			tok = strtok(NULL, "/");
+		}
+		if(in_aux.mode == IMDIR)
+			strcat(name, "/");
+
+		// Concateno o nome do arquivo/pasta com a string.
+		strcat(ret, name);
+		// Acrescento um espaço entre os arquivos/pastas.
+		strcat(ret, " ");
+	}
+	return ret;
 }
