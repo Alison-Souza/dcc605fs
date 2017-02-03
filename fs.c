@@ -151,6 +151,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
         lseek(sb->fd, n*sb->blksz, SEEK_SET);
         aux = write(sb->fd, iaux, sb->blksz);
         if(aux == -1) return -1;
+        return 0;
     }
 
     while(in->next != 0)
@@ -161,6 +162,35 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
         in = &iaux;
     }
 
+    //Percorre para axar um local vazio
+    for(ii=0;ii<NLINKS;ii++)
+    {
+        if(in->links[ii] == 0)
+        {
+            in->links[ii] = block;
+            //escreve o novo inode
+            lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
+            aux = write(sb->fd, iaux, sb->blksz);
+            return 0;
+        }
+    }
+
+    //Cria um novo inode
+    n = fs_get_block(sb); //precisa checar o retorno?
+    in->next = n;
+    iaux->mode = IMCHILD;
+    iaux->parent = in_n
+    iaux->next = 0;
+    iaux->meta = iaux_n;
+    iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
+    iaux->links[0] = block;
+
+    //escreve o novo inode
+    lseek(sb->fd, n*sb->blksz, SEEK_SET);
+    aux = write(sb->fd, iaux, sb->blksz);
+    if(aux == -1) return -1;
+    return 0;
+    }
 
 }
 //====================================================================//
