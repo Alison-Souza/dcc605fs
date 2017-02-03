@@ -459,6 +459,7 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 	if(in.mode == IMDIR)
 	{
 		errno = EISDIR;
+		free (reader);
 		return -1;
 	}
 
