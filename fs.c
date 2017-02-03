@@ -9,6 +9,7 @@
 
 #include "fs.h"
 
+int NLINKS;
 //======================== FUNÇÕES AUXILIARES ========================//
 /*
 Operations Modes
@@ -114,6 +115,52 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 	return (uint64_t) -1;
 }
 
+/*
+*
+*
+*/
+int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t block)
+{
+    int ii;
+    uint64_t aux,iaux_n;
+    struct inode *iaux = (struct inode*) malloc (sb->blksz);
+
+    if(in->next == 0)
+    {
+        //Percorre para axar um local vazio
+        for(ii=0;ii<NLINKS;ii++)
+        {
+            if(in->links[ii] == 0)
+            {
+                in->links[ii] = block;
+                return 0;
+            }
+        }
+
+        //Cria um novo inode
+        n = fs_get_block(sb); //precisa checar o retorno?
+        in->next = n;
+        iaux->mode = IMCHILD;
+        iaux->parent = in_n
+        iaux->next = 0;
+        iaux->meta = in_n;
+        iaux->links = (uint64_t*) malloc(); //Links, what to do?
+        //escreve o novo inode
+        lseek(sb->fd, n*sb->blksz, SEEK_SET);
+        aux = write(sb->fd, iaux, sb->blksz);
+        if(aux == -1) return -1;
+    }
+
+    while(in->next != 0)
+    {
+        iaux_n = in->next;
+        lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
+        aux = read(sb->fd, &iaux, sb->blksz);
+        in = &iaux;
+    }
+
+
+}
 //====================================================================//
 
 /* Build a new filesystem image in =fname (the file =fname should be
@@ -128,6 +175,7 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
  * the function fails and sets errno to ENOSPC. */
 struct superblock * fs_format(const char *fname, uint64_t blocksize)
 {
+	NLINKS = (blocksize - (4 * sizeof(uint64_t)))/sizeof(uint64_t);
 	// Verifica se o tamanho do bloco é menor que o mínimo.
 	if(blocksize < MIN_BLOCK_SIZE)
 	{
@@ -553,7 +601,6 @@ int fs_unlink(struct superblock *sb, const char *fname)
 	struct nodeinfo ni;
 	int aux;
 	int i, index;
-	int nlinks = (sb->blksz - (4 * sizeof(uint64_t)))/sizeof(uint64_t);
 
 	// Posicionando o ponteiro na posição do primeiro inode para ler.
 	lseek(sb->fd, block*sb->blksz, SEEK_SET);
@@ -635,7 +682,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 	}
 
 	//Erro se o caminho dname nao comeca com \ e se tem espaco
-    if((*dname != '\\') || (strpbrk(dname,' ') != NULL) )
+    if((*dname != '\\') || (strchr(dname,' ') != NULL) )
     {
         errno = ENOENT;
         return -1;
