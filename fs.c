@@ -121,74 +121,74 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 */
 int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t block)
 {
-    int ii;
-    uint64_t aux,iaux_n,n;
-    struct inode *iaux = (struct inode*) malloc (sb->blksz);
+	int ii;
+	uint64_t aux,iaux_n,n;
+	struct inode *iaux = (struct inode*) malloc (sb->blksz);
 
-    if(in->next == 0)
-    {
-        //Percorre para axar um local vazio
-        for(ii=0;ii<NLINKS;ii++)
-        {
-            if(in->links[ii] == 0)
-            {
-                in->links[ii] = block;
-                return 0;
-            }
-        }
+	if(in->next == 0)
+	{
+		//Percorre para axar um local vazio
+		for(ii=0;ii<NLINKS;ii++)
+		{
+			if(in->links[ii] == 0)
+			{
+				in->links[ii] = block;
+				return 0;
+			}
+		}
 
-        //Cria um novo inode
-        n = fs_get_block(sb); //precisa checar o retorno?
-        in->next = n;
-        iaux->mode = IMCHILD;
-        iaux->parent = in_n;
-        iaux->next = 0;
-        iaux->meta = in_n;
-        iaux->links[0] = block;
+		//Cria um novo inode
+		n = fs_get_block(sb); //precisa checar o retorno?
+		in->next = n;
+		iaux->mode = IMCHILD;
+		iaux->parent = in_n;
+		iaux->next = 0;
+		iaux->meta = in_n;
+		iaux->links[0] = block;
 
-        //escreve o novo inode
-        lseek(sb->fd, n*sb->blksz, SEEK_SET);
-        aux = write(sb->fd, iaux, sb->blksz);
-        if(aux == -1) return -1;
-        return 0;
-    }
+		//escreve o novo inode
+		lseek(sb->fd, n*sb->blksz, SEEK_SET);
+		aux = write(sb->fd, iaux, sb->blksz);
+		if(aux == -1) return -1;
+		return 0;
+	}
 
-    while(in->next != 0)
-    {
-        iaux_n = in->next;
-        lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
-        aux = read(sb->fd, &iaux, sb->blksz);
-        in = &iaux;
-    }
+	while(in->next != 0)
+	{
+		iaux_n = in->next;
+		lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
+		aux = read(sb->fd, &iaux, sb->blksz);
+		in = &iaux;
+	}
 
-    //Percorre para axar um local vazio
-    for(ii=0;ii<NLINKS;ii++)
-    {
-        if(in->links[ii] == 0)
-        {
-            in->links[ii] = block;
-            //escreve o novo inode
-            lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
-            aux = write(sb->fd, iaux, sb->blksz);
-            return 0;
-        }
-    }
+	//Percorre para axar um local vazio
+	for(ii=0;ii<NLINKS;ii++)
+	{
+		if(in->links[ii] == 0)
+		{
+			in->links[ii] = block;
+			//escreve o novo inode
+			lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
+			aux = write(sb->fd, iaux, sb->blksz);
+			return 0;
+		}
+	}
 
-    //Cria um novo inode
-    n = fs_get_block(sb); //precisa checar o retorno?
-    in->next = n;
-    iaux->mode = IMCHILD;
-    iaux->parent = in_n;
-    iaux->next = 0;
-    iaux->meta = iaux_n;
-    iaux->links[0] = block;
+	//Cria um novo inode
+	n = fs_get_block(sb); //precisa checar o retorno?
+	in->next = n;
+	iaux->mode = IMCHILD;
+	iaux->parent = in_n;
+	iaux->next = 0;
+	iaux->meta = iaux_n;
+	iaux->links[0] = block;
 
-    //escreve o novo inode
-    lseek(sb->fd, n*sb->blksz, SEEK_SET);
-    aux = write(sb->fd, iaux, sb->blksz);
-    if(aux == -1) return -1;
-    return 0;
-    }
+	//escreve o novo inode
+	lseek(sb->fd, n*sb->blksz, SEEK_SET);
+	aux = write(sb->fd, iaux, sb->blksz);
+	if(aux == -1) return -1;
+	return 0;
+}
 
 //====================================================================//
 
@@ -810,15 +810,4 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 		strcat(ret, " ");
 	}
 	return ret;
-
-/*	
-Verificar EBADF.
-Verificar tamanho do nome.
-Verificar se o diretotio dname existe.
-Ler o inode.
-Verificar se dname é um diretótio.
-Ler o nodeinfo e ver quantos arquivos a pasta tem.
-Percorrer os links do diretório pegando o nome de cada arquivo e 
-diretório e encadeando eles.
-*/
 }
