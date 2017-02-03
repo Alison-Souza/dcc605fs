@@ -119,10 +119,10 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 *
 *
 */
-int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t block)
+int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t block)
 {
     int ii;
-    uint64_t aux,iaux_n;
+    uint64_t aux,iaux_n,n;
     struct inode *iaux = (struct inode*) malloc (sb->blksz);
 
     if(in->next == 0)
@@ -141,10 +141,9 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
         n = fs_get_block(sb); //precisa checar o retorno?
         in->next = n;
         iaux->mode = IMCHILD;
-        iaux->parent = in_n
+        iaux->parent = in_n;
         iaux->next = 0;
         iaux->meta = in_n;
-        iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
         iaux->links[0] = block;
 
         //escreve o novo inode
@@ -179,10 +178,9 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
     n = fs_get_block(sb); //precisa checar o retorno?
     in->next = n;
     iaux->mode = IMCHILD;
-    iaux->parent = in_n
+    iaux->parent = in_n;
     iaux->next = 0;
     iaux->meta = iaux_n;
-    iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
     iaux->links[0] = block;
 
     //escreve o novo inode
@@ -192,7 +190,6 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
     return 0;
     }
 
-}
 //====================================================================//
 
 /* Build a new filesystem image in =fname (the file =fname should be
@@ -661,7 +658,7 @@ int fs_unlink(struct superblock *sb, const char *fname)
 	{
 		// Libero todos os links desse inode
 		// (todos estão em uso, já que tem mais inode).
-		for(i = 0; i < nlinks; i++)
+		for(i = 0; i < NLINKS; i++)
 		{
 			fs_put_block(sb, curr_in.links[i]);
 		}
