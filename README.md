@@ -1,5 +1,3 @@
-# dcc605fs
-Trabalho da disciplina Sistemas Operacionais sobre Sistemas de Arquivos.
 Tarefas:
 
 fs_format(fname, blocksize)
@@ -65,6 +63,8 @@ fs_list_dir(sb, dname)
 	os diretorios devem ter uma / ao final do nome.
 	a ordem dos arquivos não importa.
 	não foi dito se pode retornar erro (caso diretorio vazio, etc...)
+
+-----------------------------------------------------------------------------
 
 References: 
 
