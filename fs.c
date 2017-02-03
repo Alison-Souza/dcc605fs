@@ -144,7 +144,9 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t 
         iaux->parent = in_n
         iaux->next = 0;
         iaux->meta = in_n;
-        iaux->links = (uint64_t*) malloc(); //Links, what to do?
+        iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
+        iaux->links[0] = block;
+
         //escreve o novo inode
         lseek(sb->fd, n*sb->blksz, SEEK_SET);
         aux = write(sb->fd, iaux, sb->blksz);
