@@ -23,11 +23,11 @@ Operations Modes
 uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 {
 
-    if(opmode == 1)
-    {
-        char * lastbar = strrchr(fname,'\\');
-        *lastbar = '\0';
-    }
+	if(opmode == 1)
+	{
+		char * lastbar = strrchr(fname,'\\');
+		*lastbar = '\0';
+	}
 
 	// Fila dos blocos a serem percorridos.
 	uint64_t* fila =  (uint64_t*) malloc (sb->blks * sizeof(uint64_t));
@@ -698,7 +698,7 @@ int fs_unlink(struct superblock *sb, const char *fname)
 
 int fs_mkdir(struct superblock *sb, const char *dname)
 {
-    // Verifica o descritor do sistema de arquivos.
+	// Verifica o descritor do sistema de arquivos.
 	if(sb->magic != 0xdcc605f5)
 	{
 		errno = EBADF;
@@ -713,13 +713,13 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 	}
 
 	//Erro se o caminho dname nao comeca com \ e se tem espaco
-    if((*dname != '\\') || (strchr(dname,' ') != NULL) )
-    {
-        errno = ENOENT;
-        return -1;
-    }
+	if((*dname != '\\') || (strchr(dname,' ') != NULL) )
+	{
+		errno = ENOENT;
+		return -1;
+	}
 
-    //Erro se o diretorio ja existe
+	//Erro se o diretorio ja existe
 	uint64_t block = find_block(sb, dname, 0);
 	if(block > 0)
 	{
@@ -738,6 +738,5 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
 {
-
 	return NULL;
 }
