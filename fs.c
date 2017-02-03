@@ -738,5 +738,53 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
 {
+		// Verifica o descritor do sistema de arquivos.
+	if(sb->magic != 0xdcc605f5)
+	{
+		errno = EBADF;
+		return NULL;
+	}
+
+	// Verifica se o nome do arquivo (caminho) é maior que o permitido.
+	if(strlen(dname) > ((sb->blksz) - (8*sizeof(uint64_t))))
+	{
+		errno = ENAMETOOLONG;
+		return NULL;
+	}
+
+	// Procura o indice do inode de dname, e verifica se dname existe.
+	uint64_t block = find_block(sb, dname, 0);
+	if(block < 0)
+	{
+		errno = ENOENT;
+		return NULL;
+	}
+
+	struct inode in;
+	int aux;
+	// Posiciono e leio o inode de dname.
+	lseek(sb->fd, block * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, &in, sb->blksz);
+
+	// Verifica se o caminho dname aponta para um diretório.
+	if(in.mode != IMDIR)
+	{
+		errno = ENOTDIR;
+		return NULL;
+	}
+
+
+
+
+/*	
+Verificar EBADF.
+Verificar tamanho do nome.
+Verificar se o diretotio dname existe.
+Ler o inode.
+Verificar se dname é um diretótio.
+Percorrer os links do diretório pegando o nome de cada arquivo e 
+diretório e encadeando eles.
+*/
+
 	return NULL;
 }
