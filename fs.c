@@ -521,6 +521,7 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 			bufaux += mod;
 		}
 	}
+	free(reader);
 	return bufaux;
 }
 
@@ -660,5 +661,6 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
 {
+
 	return NULL;
 }
