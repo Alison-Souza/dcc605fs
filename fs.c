@@ -167,7 +167,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t
         if(in->links[ii] == 0)
         {
             in->links[ii] = block;
-            //escreve o novo inode
+            //escreve o inode de volta
             lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
             aux = write(sb->fd, iaux, sb->blksz);
             return 0;
@@ -727,7 +727,19 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 		return -1;
 	}
 
-
+    uint64_t parent_n = find_block(sb,dname, 1);
+    //Erro, dir pai n existe
+    if(parent_n < 0)
+    {
+        errno = ENOENT;
+        return -1;
+    }
+    struct inode parentdir;
+    struct inode dir;
+    struct nodeinfo dir_ni;
+    dir.mode = IMDIR;
+    dir.next = 0;
+    dir.parent = parent_n;
 	return -1;
 }
 
