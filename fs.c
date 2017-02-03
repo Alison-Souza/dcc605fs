@@ -25,9 +25,11 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 
 	if(opmode == 1)
 	{
-		char * lastbar = strrchr(fname,'/');
-		*lastbar = '\0';
-		if(strlen(fname) == 0) return 2; //retorna o endereço da raiz
+	    char* c = strrchr(fname,'/');
+		char lastbar[strlen(c)+1];
+		strcpy(lastbar,c);
+		lastbar[0] = '\0';
+		if(strlen(lastbar) == 0) return 2; //retorna o endereço da raiz
 	}
 
 	// Fila dos blocos a serem percorridos.
@@ -79,7 +81,7 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 			// Posicionando o ponteiro na posição do nodeinfo.
 			lseek(sb->fd, ((in->meta)*sb->blksz), SEEK_SET);
 			// Lendo o nodeinfo.
-			aux = read(sb->fd, &ni, sb->blksz);
+			aux = read(sb->fd, ni, sb->blksz);
 
 			// Se o nome do arquivo é igual ao parâmetro proocurado.
 			if(strcmp(ni->name, fname) == 0)
@@ -113,8 +115,8 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 	free(visitado);
 	free(ni);
 	free(in);
-	// Caso erro, retorna -1.
-	return -1;
+	// Caso erro, retorna -1. //(uint64_t)-1 n tem negativo :v
+	return 0;
 }
 
 /*
@@ -142,6 +144,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
 
         //Cria um novo inode
         n = fs_get_block(sb); //precisa checar o retorno?
+        if(n == (uint64_t)-1) return -1;
         in->next = n;
         iaux->mode = IMCHILD;
         iaux->parent = in_n;
@@ -180,7 +183,8 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t 
     }
 
     //Cria um novo inode
-    n = fs_get_block(sb); //precisa checar o retorno?
+    n = fs_get_block(sb);
+    if(n == (uint64_t)-1) return -1;
     in->next = n;
     iaux->mode = IMCHILD;
     iaux->parent = in_n;
@@ -409,7 +413,7 @@ uint64_t fs_get_block(struct superblock *sb)
 	if(sb->freeblks == 0)
 	{
 		errno = ENOSPC;
-		return 0;
+		return (uint64_t) -1;
 	}
 
 	struct freepage *page = (struct freepage*) malloc (sb->blksz);
@@ -417,7 +421,7 @@ uint64_t fs_get_block(struct superblock *sb)
 	lseek(sb->fd, (sb->freelist * sb->blksz), SEEK_SET);
 	// Verificando se há algum erro na leitura
 	int aux = read(sb->fd, page, sb->blksz);
-	if(aux == -1) return (uint64_t) -1;
+	if(aux == -1) return (uint64_t) 1;
 	// Pegando o "ponteiro" do bloco a ser retornado.
 	uint64_t block = sb->freelist;
 	// Mudando o ponteiro de lista vazia para o próximo bloco livre.
@@ -523,7 +527,7 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 
 	// Verifica se o arquivo existe no FS e salvo o "endereço" dele.
 	uint64_t block = find_block(sb, fname, 0);
-	if(block < 0)
+	if(block == 0)
 	{
 		errno = ENOENT;
 		return -1;
@@ -627,7 +631,7 @@ int fs_unlink(struct superblock *sb, const char *fname)
 
 	// Verifica se o arquivo existe no FS.
 	uint64_t block = find_block(sb, fname, 0);
-	if(block < 0)
+	if(block == 0)
 	{
 		errno = ENOENT;
 		return -1;
@@ -742,7 +746,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 
     uint64_t parent_n = find_block(sb,dname, 1);
     //Erro, dir pai n existe
-    if(parent_n < 0)
+    if(parent_n == 0)
     {
         errno = ENOENT;
         return -1;
@@ -752,7 +756,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
     uint64_t dir_n,dirni_n;
     dir_n = fs_get_block(sb);
     dirni_n = fs_get_block(sb);
-    if(dirni_n == -1 || dir_n == -1) return -1;
+    if(dirni_n == (uint64_t)-1 || dir_n > (uint64_t)-1) return -1;
     struct inode *parentdir = (struct inode*) calloc(sb->blksz,1);
     struct inode *dir = (struct inode*) calloc(sb->blksz,1);
     struct nodeinfo *dirni = (struct nodeinfo*) calloc(sb->blksz,1);
@@ -815,7 +819,7 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 
 	// Procura o indice do inode de dname, e verifica se dname existe.
 	uint64_t block = find_block(sb, dname, 0);
-	if(block < 0)
+	if(block == 0)
 	{
 		errno = ENOENT;
 		return NULL;
