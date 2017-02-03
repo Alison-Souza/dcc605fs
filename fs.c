@@ -23,11 +23,11 @@ Operations Modes
 uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 {
 
-    if(opmode == 1)
-    {
-        char * lastbar = strrchr(fname,'\\');
-        *lastbar = '\0';
-    }
+	if(opmode == 1)
+	{
+		char * lastbar = strrchr(fname,'\\');
+		*lastbar = '\0';
+	}
 
 	// Fila dos blocos a serem percorridos.
 	uint64_t* fila =  (uint64_t*) malloc (sb->blks * sizeof(uint64_t));
@@ -121,47 +121,45 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 */
 int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n uint64_t block)
 {
-    int ii;
-    uint64_t aux,iaux_n;
-    struct inode *iaux = (struct inode*) malloc (sb->blksz);
+	int ii;
+	uint64_t aux,iaux_n;
+	struct inode *iaux = (struct inode*) malloc (sb->blksz);
 
-    if(in->next == 0)
-    {
-        //Percorre para axar um local vazio
-        for(ii=0;ii<NLINKS;ii++)
-        {
-            if(in->links[ii] == 0)
-            {
-                in->links[ii] = block;
-                return 0;
-            }
-        }
+	if(in->next == 0)
+	{
+		//Percorre para axar um local vazio
+		for(ii=0;ii<NLINKS;ii++)
+		{
+			if(in->links[ii] == 0)
+			{
+				in->links[ii] = block;
+				return 0;
+			}
+		}
 
-        //Cria um novo inode
-        n = fs_get_block(sb); //precisa checar o retorno?
-        in->next = n;
-        iaux->mode = IMCHILD;
-        iaux->parent = in_n
-        iaux->next = 0;
-        iaux->meta = in_n;
-        iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
-        iaux->links[0] = block;
+		//Cria um novo inode
+		n = fs_get_block(sb); //precisa checar o retorno?
+		in->next = n;
+		iaux->mode = IMCHILD;
+		iaux->parent = in_n
+		iaux->next = 0;
+		iaux->meta = in_n;
+		iaux->links = (uint64_t*) calloc(NLINKS,sizeof(uint64_t)); //Links, what to do?
+		iaux->links[0] = block;
 
-        //escreve o novo inode
-        lseek(sb->fd, n*sb->blksz, SEEK_SET);
-        aux = write(sb->fd, iaux, sb->blksz);
-        if(aux == -1) return -1;
-    }
+		//escreve o novo inode
+		lseek(sb->fd, n*sb->blksz, SEEK_SET);
+		aux = write(sb->fd, iaux, sb->blksz);
+		if(aux == -1) return -1;
+	}
 
-    while(in->next != 0)
-    {
-        iaux_n = in->next;
-        lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
-        aux = read(sb->fd, &iaux, sb->blksz);
-        in = &iaux;
-    }
-
-
+	while(in->next != 0)
+	{
+		iaux_n = in->next;
+		lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
+		aux = read(sb->fd, &iaux, sb->blksz);
+		in = &iaux;
+	}
 }
 //====================================================================//
 
@@ -671,7 +669,7 @@ int fs_unlink(struct superblock *sb, const char *fname)
 
 int fs_mkdir(struct superblock *sb, const char *dname)
 {
-    // Verifica o descritor do sistema de arquivos.
+	// Verifica o descritor do sistema de arquivos.
 	if(sb->magic != 0xdcc605f5)
 	{
 		errno = EBADF;
@@ -686,13 +684,13 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 	}
 
 	//Erro se o caminho dname nao comeca com \ e se tem espaco
-    if((*dname != '\\') || (strchr(dname,' ') != NULL) )
-    {
-        errno = ENOENT;
-        return -1;
-    }
+	if((*dname != '\\') || (strchr(dname,' ') != NULL) )
+	{
+		errno = ENOENT;
+		return -1;
+	}
 
-    //Erro se o diretorio ja existe
+	//Erro se o diretorio ja existe
 	uint64_t block = find_block(sb, dname, 0);
 	if(block > 0)
 	{
@@ -711,6 +709,5 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
 {
-
 	return NULL;
 }
