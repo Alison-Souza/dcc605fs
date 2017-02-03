@@ -448,13 +448,8 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 
 	struct inode in;
 	struct nodeinfo ni;
-<<<<<<< HEAD
-	int aux, bufaux, nlinks, mem_in, i, mod;
+	int aux, bufaux, nlinks, i, mod;
 	char* reader = (char*) malloc (sb->blksz);
-
-=======
-	int aux;
->>>>>>> parent of 93cd2cd... Correções find_block
 	// Posiciono o ponteiro na posição do inode do arquivo que vou ler.
 	lseek(sb->fd, block * sb->blksz, SEEK_SET);
 	// Carrego o inode.
@@ -472,7 +467,6 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 	// Carrego o nodeinfo.
 	aux = read(sb->fd, &ni, sb->blksz);
 
-<<<<<<< HEAD
 	// Quantos links tem 1 inode cheio.
 	nlinks = (sb->blksz - 4 * sizeof(uint64_t)) / sizeof(uint64_t);
 	// bufaux salva quantos bytes foream lidos.
@@ -528,15 +522,6 @@ ssize_t fs_read_file(struct superblock *sb, const char *fname,
 		}
 	}
 	return bufaux;
-=======
-	
-
-	//se existir ler bufsz bytes do arquivo fname e salvar em buf.
-	//retornar a quantidade de bytes lidos (pode ser menor que bufsz).
-	//retorna negativo caso erro.
-
-	return -1;
->>>>>>> parent of 93cd2cd... Correções find_block
 }
 
 int fs_unlink(struct superblock *sb, const char *fname)
