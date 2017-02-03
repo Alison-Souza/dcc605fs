@@ -119,7 +119,7 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 *
 *
 */
-int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t block)
+int link_block(struct superblock *sb, struct inode *in, uint64_t in_n, uint64_t block)
 {
     int ii;
     uint64_t aux,iaux_n,n;
@@ -158,7 +158,7 @@ int link_block(struct superblock *sb, struct inode *in, uint64_t *in_n, uint64_t
         iaux_n = in->next;
         lseek(sb->fd, iaux_n*sb->blksz, SEEK_SET);
         aux = read(sb->fd, &iaux, sb->blksz);
-        in = &iaux;
+        in = iaux;
     }
 
     //Percorre para axar um local vazio
@@ -697,6 +697,7 @@ int fs_unlink(struct superblock *sb, const char *fname)
 
 int fs_mkdir(struct superblock *sb, const char *dname)
 {
+	int aux;
 	// Verifica o descritor do sistema de arquivos.
 	if(sb->magic != 0xdcc605f5)
 	{
@@ -733,13 +734,48 @@ int fs_mkdir(struct superblock *sb, const char *dname)
         errno = ENOENT;
         return -1;
     }
+
+    //Cria estrutura inode e nodeinfo do novo diretorio
+    uint64_t dir_n,dirni_n;
+    dir_n = fs_get_block(sb);
+    dirni_n = fs_get_block(sb);
+    if(dirni_n == -1 || dir_n == -1) return -1;
     struct inode parentdir;
     struct inode dir;
-    struct nodeinfo dir_ni;
+    struct nodeinfo dirni, parent_ni;
     dir.mode = IMDIR;
     dir.next = 0;
     dir.parent = parent_n;
-	return -1;
+    dir.meta = dirni_n;
+    char *auxc = strrchr(dname,'\\');
+    strcpy(dirni.name,auxc);
+    dirni.size = 0;
+
+     //Le o inode diretorio pai
+     lseek(sb->fd, parent_n*sb->blksz, SEEK_SET);
+     aux = read(sb->fd, &parentdir, sb->blksz);
+
+     //linka o inode do novo dir ao dir pai
+     link_block(sb,&parentdir,parent_n,dir_n);
+
+      //Le o nodeinfo diretorio pai para alterar o numero de arquivos e escreve de volta
+     lseek(sb->fd, parentdir.meta*sb->blksz, SEEK_SET);
+     aux = read(sb->fd, &parent_ni, sb->blksz);
+     parent_ni.size++;
+     lseek(sb->fd, parentdir.meta*sb->blksz, SEEK_SET);
+	 aux = write(sb->fd,&parent_ni,sb->blksz);
+
+	 //escreve de volta o inode do pai
+	 lseek(sb->fd, parent_n*sb->blksz, SEEK_SET);
+	 aux = write(sb->fd,&parentdir,sb->blksz);
+
+	 //Escreve o inode e nodeinfo do novo diretorio
+	 lseek(sb->fd, dir_n*sb->blksz, SEEK_SET);
+	 aux = write(sb->fd,&dir,sb->blksz);
+	 lseek(sb->fd, dirni_n*sb->blksz, SEEK_SET);
+	 aux = write(sb->fd,&dirni,sb->blksz);
+
+	return 0;
 }
 
 int fs_rmdir(struct superblock *sb, const char *dname)
