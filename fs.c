@@ -766,7 +766,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
     dir->parent = parent_n;
     dir->meta = dirni_n;
     char *auxc = strrchr(dname,'/');
-    strcpy(dirni->name,auxc);
+    strcpy(dirni->name,auxc+1);
     dirni->size = 0;
 
      //Le o inode diretorio pai
@@ -830,7 +830,8 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 	struct nodeinfo *ni = (struct nodeinfo*) calloc(sb->blksz,1);
 	struct nodeinfo *ni_aux = (struct nodeinfo*) calloc(sb->blksz,1);
 	int aux, i;
-	char* ret = (char*) malloc (500 * sizeof(char));
+	char* ret = (char*) calloc (500 , sizeof(char));
+
 	char* tok;
 	char name[50];
 
@@ -853,10 +854,10 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 	for(i = 0; i < ni->size; i++)
 	{
 		// Leio o inode de cada arquivo/pasta dentro do diretorio dname.
-		lseek(sb->fd, in->links[i], SEEK_SET);
+		lseek(sb->fd, in->links[i] * sb->blksz, SEEK_SET);
 		aux = read(sb->fd, in_aux, sb->blksz);
 		// Leio o nodeinfo desse inode.
-		lseek(sb->fd, in_aux->meta, SEEK_SET);
+		lseek(sb->fd, in_aux->meta * sb->blksz, SEEK_SET);
 		aux = read(sb->fd, ni_aux, sb->blksz);
 		// Pego o nome completo desse arquivo/pasta e divido ela em
 		// substrings divididas pela /. Salvo a última parte.
