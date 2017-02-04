@@ -25,11 +25,12 @@ uint64_t find_block(struct superblock *sb, const char *fname, int opmode)
 
 	if(opmode == 1)
 	{
-	    char* c = strrchr(fname,'/');
-		char lastbar[strlen(c)+1];
-		strcpy(lastbar,c);
-		lastbar[0] = '\0';
+	    char lastbar[strlen(fname)+1];
+		strcpy(lastbar,fname);
+		char* c = strrchr(lastbar,'/');
+		*c= '\0';
 		if(strlen(lastbar) == 0) return 2; //retorna o endereço da raiz
+		fname = lastbar;
 	}
 
 	// Fila dos blocos a serem percorridos.
@@ -766,7 +767,7 @@ int fs_mkdir(struct superblock *sb, const char *dname)
     dir->parent = parent_n;
     dir->meta = dirni_n;
     char *auxc = strrchr(dname,'/');
-    strcpy(dirni->name,auxc+1);
+    strcpy(dirni->name,auxc);
     dirni->size = 0;
 
      //Le o inode diretorio pai
@@ -793,12 +794,88 @@ int fs_mkdir(struct superblock *sb, const char *dname)
 	 lseek(sb->fd, dirni_n*sb->blksz, SEEK_SET);
 	 aux = write(sb->fd,dirni,sb->blksz);
 
+    free(parentdir);
+    free(parent_ni);
+    free(dir);
+    free(dirni);
 	return 0;
 }
 
 int fs_rmdir(struct superblock *sb, const char *dname)
 {
-	return -1;
+    int aux,ii;
+	// Verifica o descritor do sistema de arquivos.
+	if(sb->magic != 0xdcc605f5)
+	{
+		errno = EBADF;
+		return -1;
+	}
+
+	// Verifica se o nome do arquivo (caminho) é maior que o permitido.
+	if(strlen(dname) > ((sb->blksz) - (8*sizeof(uint64_t))))
+	{
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	//Erro se o caminho dname nao comeca com \ e se tem espaco
+	if((*dname != '/') || (strchr(dname,' ') != NULL) )
+	{
+		errno = ENOENT;
+		return -1;
+	}
+
+	//Erro se o diretorio nao existe
+	uint64_t block = find_block(sb, dname, 0);
+	if(block == 0)
+	{
+		errno = ENOENT;
+		return -1;
+	}
+	fs_put_block(sb,block); //deleta o bloco
+
+    uint64_t parent_n = find_block(sb,dname, 1);
+    uint64_t curr_n;
+    struct inode *parentdir = (struct inode*) calloc(sb->blksz,1);
+    struct inode *dir = (struct inode*) calloc(sb->blksz,1);
+    struct nodeinfo *dirni = (struct nodeinfo*) calloc(sb->blksz,1);
+    struct nodeinfo *parent_ni = (struct nodeinfo*) calloc(sb->blksz,1);
+
+    //Arruma as info do nodeinfo e inode pai
+    lseek(sb->fd, parent_n*sb->blksz, SEEK_SET);
+    aux = read(sb->fd, parentdir, sb->blksz);
+    lseek(sb->fd, parentdir->meta*sb->blksz, SEEK_SET);
+    aux = read(sb->fd, parent_ni, sb->blksz);
+    parent_ni->size--;
+    lseek(sb->fd, parentdir->meta*sb->blksz, SEEK_SET);
+    aux = write(sb->fd,parent_ni,sb->blksz);
+
+
+    //Procura pela referencia ao diretorio no pai e delta-a
+    curr_n = parent_n;
+    do
+    {
+        lseek(sb->fd, curr_n*sb->blksz, SEEK_SET);
+        aux = read(sb->fd, dir, sb->blksz);
+        for(ii=0;ii<NLINKS;ii++)
+        {
+            if(dir->links[ii] == block)
+            {
+                dir->links[ii] = 0;
+                lseek(sb->fd, curr_n*sb->blksz, SEEK_SET);
+                aux = write(sb->fd, dir, sb->blksz);
+                break;
+            }
+        }
+        curr_n = dir->next;
+    }while(curr_n != 0);
+
+
+    free(parentdir);
+    free(parent_ni);
+    free(dir);
+    free(dirni);
+	return 0;
 }
 
 char * fs_list_dir(struct superblock *sb, const char *dname)
