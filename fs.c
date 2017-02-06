@@ -407,14 +407,14 @@ uint64_t fs_get_block(struct superblock *sb)
 	if(sb->magic != 0xdcc605f5)
 	{
 		errno = EBADF;
-		return (uint64_t) -1;
+		return (uint64_t) 0;
 	}
 
 	// Verificando se há blocos livres.
 	if(sb->freeblks == 0)
 	{
 		errno = ENOSPC;
-		return (uint64_t) -1;
+		return (uint64_t) 0;
 	}
 
 	struct freepage *page = (struct freepage*) calloc (sb->blksz,1);
@@ -425,7 +425,7 @@ uint64_t fs_get_block(struct superblock *sb)
 	if(aux == -1)
 	{
 		free(page);
-		return (uint64_t) 1;
+		return (uint64_t) 0;
 	}
 	// Pegando o "ponteiro" do bloco a ser retornado.
 	uint64_t block = sb->freelist;
@@ -440,7 +440,7 @@ uint64_t fs_get_block(struct superblock *sb)
 	if(aux == -1)
 	{
 		free(page);
-		return (uint64_t) 1;
+		return (uint64_t) 0;
 	}
 
 	free(page);
@@ -1094,6 +1094,22 @@ int fs_rmdir(struct superblock *sb, const char *dname)
 	//Le o inode do bloco
 	lseek(sb->fd, block*sb->blksz, SEEK_SET);
 	aux = read(sb->fd, dir, sb->blksz);;
+
+	//Le o nodeinfo do bloco
+	lseek(sb->fd, dir->meta * sb->blksz, SEEK_SET);
+	aux = read(sb->fd, dirni, sb->blksz);
+
+	// Verificando se a pasta não está vazia:
+	if(dirni->size > 0)
+	{
+		errno = ENOTEMPTY;
+		free(parentdir);
+		free(parent_ni);
+		free(dir);
+		free(dirni);
+		return -1;
+	}
+
 	fs_put_block(sb,dir->meta); //deleta o nodeinfo do bloco
 	fs_put_block(sb,block); //deleta o inode do bloco
 	memset(dir,0,sb->blksz); //limpa o dir
