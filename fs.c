@@ -1224,5 +1224,4 @@ char * fs_list_dir(struct superblock *sb, const char *dname)
 	free(ni);
 	free(ni_aux);
 	return ret;
-	//CORRIGIR E FAZER ELE PERCORRER OS LINKS DOS CHILDS TAMBEM
 }
